@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Typewriter Web - A modern typewriter-themed progressive web app for distraction-free writing" />
+  <meta name="theme-color" content="#2c2825" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Typewriter Web" />
+  <meta name="application-name" content="Typewriter Web" />
+
+  <title>Typewriter Web</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" sizes="any" href="icon.png" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="stylesheet" href="style.css" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Special+Elite&family=IBM+Plex+Mono:wght@400;500;700&family=JetBrains+Mono:wght@400;700&family=VT323&display=swap" />
+</head>
+<body data-theme="classic">
+  <!-- Splash Screen -->
+  <div class="splash" id="splash">
+    <div class="splash-content">
+      <div class="splash-logo">⌨</div>
+      <div class="splash-title">Typewriter Web</div>
+      <div class="splash-loader"></div>
+    </div>
+  </div>
+
+  <div class="app-container" id="app">
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <button class="icon-btn" id="docListBtn" title="Documents" aria-label="Toggle Documents">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+        </button>
+        <div class="brand">
+          <span class="brand-icon">⌨</span>
+          <span class="brand-name">Typewriter</span>
+        </div>
+        <div class="page-status" id="pageStatus">
+          <span class="page-status-icon">📄</span>
+          <span class="page-status-text">Page <span id="pageCurrent">1</span> of <span id="pageTotal">1</span></span>
+          <span class="page-status-progress" id="pageProgressText">0%</span>
+        </div>
+      </div>
+      <div class="doc-tabs-container">
+        <div class="doc-tabs" id="docTabs"></div>
+      </div>
+      <div class="top-bar-right">
+        <button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+        <button class="icon-btn" id="redoBtn" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
+        <button class="icon-btn" id="fullscreenBtn" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+        <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
+      </div>
+    </header>
+
+    <!-- Toolbar -->
+    <div class="toolbar" id="toolbar">
+      <div class="tool-group">
+        <label class="tool-label">Theme</label>
+        <select id="themeSelect" class="tool-select" title="Theme">
+          <option value="classic">Classic</option>
+          <option value="paper">Paper</option>
+          <option value="dark">Dark</option>
+          <option value="sepia">Sepia</option>
+          <option value="midnight">Midnight</option>
+          <option value="forest">Forest</option>
+          <option value="retro">Retro Green</option>
+          <option value="blueprint">Blueprint</option>
+          <option value="cyberpunk">Cyberpunk</option>
+          <option value="newspaper">Newspaper</option>
+          <option value="vintage">Vintage</option>
+        </select>
+      </div>
+      <div class="tool-group">
+        <label class="tool-label">Font</label>
+        <select id="fontSelect" class="tool-select" title="Font">
+          <option value="'Courier Prime', monospace">Courier Prime</option>
+          <option value="'Special Elite', 'Courier Prime', monospace">Special Elite</option>
+          <option value="'IBM Plex Mono', monospace">IBM Plex Mono</option>
+          <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+          <option value="Courier New, monospace">Courier New</option>
+          <option value="Georgia, 'Times New Roman', serif">Georgia (Serif)</option>
+          <option value="'VT323', monospace">VT323 (Pixel)</option>
+        </select>
+      </div>
+      <div class="tool-group">
+        <label class="tool-label">Size</label>
+        <select id="fontSizeSelect" class="tool-select" title="Font Size">
+          <option value="14">14px</option>
+          <option value="16">16px</option>
+          <option value="18" selected>18px</option>
+          <option value="20">20px</option>
+          <option value="22">22px</option>
+          <option value="24">24px</option>
+          <option value="28">28px</option>
+        </select>
+      </div>
+      <div class="tool-divider"></div>
+      <div class="tool-group">
+        <label class="tool-label">Sound</label>
+        <select id="soundSelect" class="tool-select" title="Sound Type">
+          <option value="off" selected>Off</option>
+          <option value="click">Click</option>
+          <option value="typewriter">Typewriter</option>
+          <option value="royal">Royal</option>
+          <option value="thock">Thock</option>
+          <option value="soft">Soft</option>
+        </select>
+      </div>
+      <div class="tool-group">
+        <label class="tool-label">Vol</label>
+        <input type="range" id="volumeSlider" min="0" max="100" value="50" class="tool-range" title="Volume" />
+      </div>
+      <div class="tool-divider"></div>
+      <div class="tool-group">
+        <button class="tool-btn" id="newDocBtn" title="New Document (Ctrl+N)">
+          <span class="tool-btn-icon">📄</span><span class="tool-btn-text">New</span>
+        </button>
+        <button class="tool-btn" id="prevPageBtn" title="Previous Page (Ctrl+Up)">
+          <span class="tool-btn-icon">◀</span><span class="tool-btn-text">Page</span>
+        </button>
+        <button class="tool-btn" id="nextPageBtn" title="Next Page (Ctrl+Down)">
+          <span class="tool-btn-icon">▶</span><span class="tool-btn-text">Page</span>
+        </button>
+        <button class="tool-btn" id="exportBtn" title="Export">
+          <span class="tool-btn-icon">📤</span><span class="tool-btn-text">Export</span>
+        </button>
+        <button class="tool-btn" id="printBtn" title="Print (Ctrl+P)">
+          <span class="tool-btn-icon">🖨</span><span class="tool-btn-text">Print</span>
+        </button>
+        <button class="tool-btn" id="goalBtn" title="Word Goal">
+          <span class="tool-btn-icon">🎯</span><span class="tool-btn-text">Goal</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Document Sidebar -->
+      <aside class="doc-sidebar" id="docSidebar">
+        <div class="sidebar-header">
+          <h3>Documents</h3>
+          <span class="sidebar-count" id="docCount">0</span>
+        </div>
+        <div class="doc-list" id="docList"></div>
+        <button class="btn btn-primary btn-full" id="newDocSidebarBtn">+ New Document</button>
+        <div class="page-navigator" id="pageNavigator">
+          <div class="page-navigator-header">
+            <span>📑 Pages</span>
+            <span class="page-navigator-count" id="pageNavCount">1</span>
+          </div>
+          <div class="page-navigator-list" id="pageNavList"></div>
+        </div>
+      </aside>
+
+      <!-- Paper Area -->
+      <div class="paper-wrapper" id="paperWrapper">
+        <div class="paper-scroll" id="paperScroll">
+          <div class="paper-stack" id="paperStack">
+            <!-- Pages are injected here by JS -->
+          </div>
+        </div>
+        <!-- Hidden master textarea — this is the actual editor input -->
+        <textarea id="editor" style="position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;" spellcheck="false" aria-hidden="true"></textarea>
+      </div>
+
+      <!-- Goal Sidebar -->
+      <aside class="goal-sidebar" id="goalSidebar">
+        <div class="sidebar-header">
+          <h3>Session Stats</h3>
+          <button class="icon-btn icon-btn-sm" id="goalSidebarClose" title="Hide stats panel">›</button>
+        </div>
+        <div class="goal-content">
+          <div class="stat-card">
+            <div class="stat-label">Today</div>
+            <div class="stat-value" id="statToday">0</div>
+            <div class="stat-sub">words written</div>
+          </div>
+          <div class="stat-card stat-progress">
+            <div class="stat-label">Goal</div>
+            <div class="stat-value" id="statGoal">0/0</div>
+            <div class="progress-bar"><div class="progress-fill" id="goalProgress"></div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Session Time</div>
+            <div class="stat-value" id="statTime">00:00</div>
+            <div class="stat-sub">since last open</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Words</div>
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-sub">across all docs</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Reading Time</div>
+            <div class="stat-value" id="statReading">0m</div>
+            <div class="stat-sub">at 200 wpm</div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Status Bar -->
+    <footer class="status-bar">
+      <div class="status-left">
+        <span class="status-item">
+          <span class="status-icon">⌖</span>
+          Ln <span id="lineNum">1</span>, Col <span id="colNum">1</span>
+        </span>
+        <span class="status-item">
+          <span class="status-icon">W</span>
+          <span id="wordCount">0</span>
+        </span>
+        <span class="status-item">
+          <span class="status-icon">C</span>
+          <span id="charCount">0</span>
+        </span>
+        <span class="status-item">
+          <span class="status-icon">P</span>
+          <span id="statusPageInfo">1/1</span>
+        </span>
+      </div>
+      <div class="status-center">
+        <span class="status-saved" id="saveStatus">✓ All changes saved</span>
+      </div>
+      <div class="status-right">
+        <span class="status-item status-version">v<span id="appVersion">1.1.1</span></span>
+      </div>
+    </footer>
+
+    <!-- Settings Panel -->
+    <aside class="settings-panel" id="settingsPanel">
+      <div class="panel-header">
+        <h3>Settings</h3>
+        <button class="icon-btn" id="closeSettingsBtn" aria-label="Close Settings">✕</button>
+      </div>
+      <div class="panel-body">
+        <div class="settings-section">
+          <h4>🎨 Appearance</h4>
+          <div class="setting-row">
+            <label>Theme</label>
+            <div class="theme-grid" id="themeGrid"></div>
+          </div>
+          <div class="setting-row">
+            <label>Font</label>
+            <select id="fontSelectS" class="setting-select"></select>
+          </div>
+          <div class="setting-row">
+            <label>Font Size <span class="setting-value" id="fontSizeValue">18px</span></label>
+            <input type="range" id="fontSizeSlider" min="12" max="32" value="18" />
+          </div>
+          <div class="setting-row">
+            <label>Line Spacing <span class="setting-value" id="lineHeightValue">1.8</span></label>
+            <input type="range" id="lineHeightSlider" min="1.2" max="2.4" step="0.1" value="1.8" />
+          </div>
+          <div class="setting-row">
+            <label>Paper Width <span class="setting-value" id="pageWidthValue">800px</span></label>
+            <input type="range" id="pageWidthSlider" min="500" max="1100" step="10" value="800" />
+          </div>
+          <div class="setting-row">
+            <label>Pages per View <span class="setting-value" id="pageCountValue">1</span></label>
+            <input type="range" id="pageCountSlider" min="1" max="4" step="1" value="1" />
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h4>🔊 Audio</h4>
+          <div class="setting-row">
+            <label>Sound Type</label>
+            <select id="soundSelectS" class="setting-select"></select>
+          </div>
+          <div class="setting-row">
+            <label>Volume <span class="setting-value" id="volumeValue">50%</span></label>
+            <input type="range" id="volumeSliderS" min="0" max="100" value="50" />
+          </div>
+          <div class="setting-row">
+            <label>Bell at Margin</label>
+            <label class="switch"><input type="checkbox" id="bellToggle" checked /><span class="switch-slider"></span></label>
+          </div>
+          <div class="setting-row">
+            <label>Carriage Return Sound</label>
+            <label class="switch"><input type="checkbox" id="carriageToggle" checked /><span class="switch-slider"></span></label>
+          </div>
+          <div class="setting-row">
+            <label>Test Sound</label>
+            <button class="btn btn-secondary btn-sm" id="testSoundBtn">▶ Test</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h4>⌨ Typewriter</h4>
+          <div class="setting-row">
+            <label>Strike Animation</label>
+            <label class="switch"><input type="checkbox" id="strikeAnimToggle" /><span class="switch-slider"></span></label>
+            <small class="setting-hint">Subtle paper tap on keystroke</small>
+          </div>
+          <div class="setting-row">
+            <label>Chars per Line <span class="setting-value" id="cplValue">80</span></label>
+            <input type="range" id="cplInput" min="40" max="120" value="80" />
+            <small class="setting-hint">Used to trigger the margin bell</small>
+          </div>
+          <div class="setting-row">
+            <label>Show Margin Guide</label>
+            <label class="switch"><input type="checkbox" id="pageGuideToggle" checked /><span class="switch-slider"></span></label>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h4>📝 Writing</h4>
+          <div class="setting-row">
+            <label>Daily Word Goal</label>
+            <input type="number" id="goalInput" min="0" value="500" class="setting-input-inline" />
+            <button class="btn btn-secondary btn-sm" id="setGoalBtn">Set</button>
+          </div>
+          <div class="setting-row">
+            <label>Auto Save</label>
+            <label class="switch"><input type="checkbox" id="autoSaveToggle" checked /><span class="switch-slider"></span></label>
+          </div>
+          <div class="setting-row">
+            <label>Auto Save Interval <span class="setting-value" id="autoSaveValue">10s</span></label>
+            <input type="range" id="autoSaveInterval" min="5" max="120" value="10" />
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h4>💾 Data</h4>
+          <div class="setting-row"><button class="btn btn-secondary btn-full" id="exportAllBtn">📦 Export All (JSON)</button></div>
+          <div class="setting-row"><button class="btn btn-secondary btn-full" id="importBtn">📥 Import (JSON)</button></div>
+          <input type="file" id="importFile" accept=".json" style="display:none;" />
+          <div class="setting-row"><button class="btn btn-secondary btn-full" id="exportPlainBtn">📄 Export All (TXT)</button></div>
+          <div class="setting-row"><button class="btn btn-danger btn-full" id="clearAllBtn">🗑 Clear All Documents</button></div>
+          <div class="setting-row"><button class="btn btn-secondary btn-full" id="resetSettingsBtn">↺ Reset All Settings</button></div>
+        </div>
+
+        <div class="settings-section settings-about">
+          <h4>ℹ About</h4>
+          <div class="about-block">
+            <div class="about-logo">⌨</div>
+            <div class="about-name">Typewriter Web</div>
+            <div class="about-version">Version <span id="appVersionS">1.1.1</span></div>
+            <div class="about-dev">Developed by <strong>Tasmon Islam</strong></div>
+            <div class="about-email"><a href="mailto:tasmon@outlook.com">tasmon@outlook.com</a></div>
+            <div class="about-desc">A modern typewriter-themed PWA for distraction-free writing. Works offline, syncs nothing, owns your data.</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Export Modal -->
+    <div class="modal" id="exportModal" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" id="exportBackdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="exportTitle">Export Document</h3>
+          <button class="icon-btn" id="closeExportBtn" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <button class="export-option" id="exportTxtBtn">
+            <span class="export-option-icon">📄</span>
+            <div class="export-option-info">
+              <div class="export-option-title">Plain Text</div>
+              <div class="export-option-desc">Save as a .txt file</div>
+            </div>
+          </button>
+          <button class="export-option" id="exportMdBtn">
+            <span class="export-option-icon">📝</span>
+            <div class="export-option-info">
+              <div class="export-option-title">Markdown</div>
+              <div class="export-option-desc">Save as a .md file</div>
+            </div>
+          </button>
+          <button class="export-option" id="copyTextBtn">
+            <span class="export-option-icon">📋</span>
+            <div class="export-option-info">
+              <div class="export-option-title">Copy to Clipboard</div>
+              <div class="export-option-desc">Copy text to use elsewhere</div>
+            </div>
+          </button>
+          <button class="export-option" id="printDocBtn">
+            <span class="export-option-icon">🖨</span>
+            <div class="export-option-info">
+              <div class="export-option-title">Print / PDF</div>
+              <div class="export-option-desc">Print or save as PDF</div>
+            </div>
+          </button>
+          <button class="export-option" id="shareDocBtn">
+            <span class="export-option-icon">🔗</span>
+            <div class="export-option-info">
+              <div class="export-option-title">Share</div>
+              <div class="export-option-desc">Share document text</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Goal Modal -->
+    <div class="modal" id="goalModal" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" id="goalBackdrop"></div>
+      <div class="modal-content modal-content-sm">
+        <div class="modal-header">
+          <h3>🎯 Set Daily Goal</h3>
+          <button class="icon-btn" id="closeGoalBtn" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body modal-body-center">
+          <p>How many words do you want to write today?</p>
+          <div class="goal-presets">
+            <button class="goal-preset" data-goal="100">100</button>
+            <button class="goal-preset" data-goal="250">250</button>
+            <button class="goal-preset" data-goal="500">500</button>
+            <button class="goal-preset" data-goal="1000">1000</button>
+            <button class="goal-preset" data-goal="2000">2000</button>
+          </div>
+          <div class="goal-custom">
+            <input type="number" id="goalCustomInput" placeholder="Custom" min="0" />
+            <span class="goal-custom-label">words</span>
+          </div>
+          <button class="btn btn-primary btn-full" id="goalSetBtn">Set Goal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div class="modal" id="confirmModal" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" id="confirmBackdrop"></div>
+      <div class="modal-content modal-content-sm">
+        <div class="modal-header">
+          <h3 id="confirmTitle">Confirm</h3>
+          <button class="icon-btn" id="confirmCloseBtn" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p id="confirmMessage">Are you sure?</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="confirmCancel">Cancel</button>
+          <button class="btn btn-danger" id="confirmOk">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div class="notifications" id="notifications" aria-live="polite"></div>
+
+    <!-- Install Prompt -->
+    <div class="install-prompt hidden" id="installPrompt">
+      <div class="install-prompt-content">
+        <div class="install-prompt-text">
+          <strong>Install Typewriter Web</strong>
+          <small>Add to home screen for offline use</small>
+        </div>
+        <div class="install-prompt-actions">
+          <button class="btn btn-primary btn-sm" id="installAccept">Install</button>
+          <button class="btn btn-secondary btn-sm" id="installDismiss">Later</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating toggles for hidden sidebars -->
+    <button class="floating-toggle floating-toggle-left hidden" id="docListShow" title="Show documents">‹</button>
+    <button class="floating-toggle floating-toggle-right hidden" id="goalSidebarShow" title="Show stats panel">‹</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
