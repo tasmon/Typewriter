@@ -1,5 +1,5 @@
-/* Typewriter Web Service Worker v1.1.2 */
-const CACHE_NAME = 'typewriter-web-v1.1.2';
+/* Typewriter Web Service Worker v1.3.0 */
+const CACHE_NAME = 'typewriter-web-v1.3.0';
 const APP_SHELL = [
   './', './index.html', './style.css', './app.js',
   './manifest.json', './icon.png'
