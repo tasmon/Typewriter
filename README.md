@@ -7,6 +7,9 @@ A modern typewriter-themed Progressive Web App for distraction-free writing.
 ![Privacy](https://img.shields.io/badge/privacy-zero%20tracking-blue)
 
 
+🖥️ [https://typewriterweb.vercel.app](https://typewriterweb.vercel.app/)
+
+
 ## What's New in v1.4.0
 
 ### Real Pagination
