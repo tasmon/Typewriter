@@ -1,5 +1,5 @@
 /* ========================================
-   TYPEWRITER WEB v1.3.0
+   TYPEWRITER WEB v1.4.0
    Major rewrite: formatting, images, tables, paging, export
    Developer: Tasmon Islam
    Email: tasmon@outlook.com
@@ -8,7 +8,7 @@
 'use strict';
 
 const CONFIG = {
-  version: '1.3.0',
+  version: '1.4.0',
   appName: 'Typewriter Web',
   developer: 'Tasmon Islam',
   email: 'tasmon@outlook.com'
@@ -80,23 +80,25 @@ const PLACEHOLDER_TEXT = "Begin typing... Click anywhere and start writing. All 
 class Settings {
   constructor() {
     this.defaults = {
-      theme: 'classic',
+      theme: 'white',
       fontFamily: "'Courier Prime', monospace",
       fontSize: 18,
       lineHeight: 1.8,
       paperWidth: 800,
-      soundType: 'off',
-      volume: 40,            // Slightly lower default for calmer feel
+      soundType: 'calm',
+      volume: 35,            // Slightly lower default for calmer feel
       bellEnabled: true,
       carriageEnabled: true,
       charsPerLine: 80,
       strikeAnim: false,
       pageGuide: true,
+      pageBackground: 'lines',   // lines | blank | grid | dots
       goal: 500,
       autoSave: true,
       autoSaveInterval: 10,
       panelLeftCollapsed: true,  // NEW: collapsed by default
-      panelRightCollapsed: true
+      panelRightCollapsed: true,
+      headerHidden: false
     };
     this.data = { ...this.defaults };
     this.load();
@@ -200,6 +202,7 @@ class AudioEngine {
       case 'royal': this.soundRoyal(now); break;
       case 'thock': this.soundThock(now); break;
       case 'soft': this.soundSoft(now); break;
+      case 'calm': this.soundCalm(now); break;
     }
   }
   // CLICK: gentle, smooth, rounded — no harsh attack
@@ -208,14 +211,38 @@ class AudioEngine {
     this._noiseBurst(now, 3500, 1.0, vel * 0.35, 0.002, 0.025);
     this._oscBurst(now, 380, vel * 0.08, 0.003, 0.045, 'sine', 280);
   }
-  // TYPEWRITER: layered but softer
+  // TYPEWRITER: authentic mechanical strike — sharp lever transient,
+  // typebar "clack" against the platen, then a short resonant body decay.
   soundTypewriter(now) {
     const vel = 0.55 + Math.random() * 0.25;
     const pv = 0.96 + Math.random() * 0.08;
-    this._noiseBurst(now, 3000 * pv, 1.3, vel * 0.4, 0.002, 0.030);
-    this._oscBurst(now, 170 * pv, vel * 0.40, 0.003, 0.110, 'sine', 80 * pv);
-    this._oscBurst(now, 400 * pv, vel * 0.20, 0.003, 0.080, 'sine', 270 * pv);
-    this._oscBurst(now, 2100 * pv, vel * 0.13, 0.004, 0.090, 'triangle', 1500 * pv);
+    // Initial sharp transient — the lever/key mechanism snapping down
+    this._noiseBurst(now, 4200 * pv, 3.2, vel * 0.55, 0.001, 0.018);
+    // The typebar striking the platen — short, slightly delayed "clack"
+    const strike = now + 0.006;
+    this._noiseBurst(strike, 2600 * pv, 2.0, vel * 0.5, 0.001, 0.022);
+    this._oscBurst(strike, 210 * pv, vel * 0.42, 0.002, 0.075, 'sine', 95 * pv);
+    // Mechanical body resonance — the frame settling
+    this._oscBurst(now, 130 * pv, vel * 0.30, 0.004, 0.130, 'sine', 68 * pv);
+    this._oscBurst(now, 2350 * pv, vel * 0.10, 0.003, 0.070, 'triangle', 1600 * pv);
+  }
+  // CALM: soft, muffled, soothing — a gentle wooden pat with almost no
+  // high-frequency click, closer to a quiet ambient writing app than a
+  // mechanical typewriter. Long, smooth, low-volume decay.
+  soundCalm(now) {
+    const vel = 0.35 + Math.random() * 0.15;
+    const pv = 0.97 + Math.random() * 0.06;
+    const src = this.noiseSrc(); if (!src) return;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 420 * pv; lp.Q.value = 0.5;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(vel * 0.22, now + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0008, now + 0.095);
+    src.connect(lp).connect(g).connect(this.masterGain);
+    src.start(now); src.stop(now + 0.1);
+    // Very soft low tone underneath, like a muted wooden knock
+    this._oscBurst(now, 210 * pv, vel * 0.14, 0.010, 0.120, 'sine', 140 * pv);
   }
   // ROYAL: heavier but rounded
   soundRoyal(now) {
@@ -405,56 +432,34 @@ class StatsTracker {
 let stats;
 
 // ============================================
-// PAGINATION (visual only)
+// PAGINATION — measured from the real rendered
+// content height, not an estimated character count.
+// The document lives in ONE continuous editable
+// area; page breaks are visual overlays computed
+// from actual layout, so nothing is ever hidden
+// or clipped regardless of how much text exists.
 // ============================================
 class Pagination {
-  constructor() { this.pages = []; this.currentPage = 0; this._lastText = null; }
-  computeCapacity() {
-    const fontSize = parseFloat(settings.get('fontSize'));
-    const lineHeight = parseFloat(settings.get('lineHeight'));
-    const paperWidth = parseFloat(settings.get('paperWidth'));
-    const paperHeight = 1100;
-    const padding = 120;
-    const lineHeightPx = fontSize * lineHeight;
-    const linesPerPage = Math.max(8, Math.floor((paperHeight - padding - 40) / lineHeightPx));
-    const charWidth = fontSize * 0.6;
-    const charsPerLine = Math.max(40, Math.floor((paperWidth - 120) / charWidth));
-    return { linesPerPage, charsPerLine, charsPerPage: Math.max(800, linesPerPage * charsPerLine) };
+  constructor() { this.pages = [0]; this.currentPage = 0; this.pageHeight = 900; }
+  computePageHeight() {
+    const paperHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--paper-height')) || 1100;
+    const vPad = 120; // 60px top + 60px bottom page padding
+    return Math.max(300, paperHeight - vPad);
   }
-  // Estimate pages from plain text content (stripped HTML)
-  rebuild(html) {
-    const text = htmlToText(html || '');
-    if (text === this._lastText && this.pages.length > 0) return;
-    this._lastText = text;
-    const cap = this.computeCapacity();
-    const pages = []; let pos = 0;
-    if (!text) {
-      pages.push({ start: 0, end: 0, text: '', preview: '' });
-    } else {
-      while (pos < text.length) {
-        const remaining = text.length - pos;
-        let endPos = remaining <= cap.charsPerPage ? text.length : this._findBreakPoint(text, pos, pos + cap.charsPerPage);
-        if (endPos <= pos) endPos = Math.min(text.length, pos + cap.charsPerPage);
-        const pt = text.slice(pos, endPos);
-        pages.push({ start: pos, end: endPos, text: pt, preview: pt.trim().split('\n')[0].slice(0, 40) });
-        pos = endPos;
-        if (pages.length > 9999) break;
-      }
-    }
-    this.pages = pages;
-    if (this.currentPage >= pages.length) this.currentPage = Math.max(0, pages.length - 1);
+  // Measure the real editor content height and derive page count from it.
+  measure(editorEl) {
+    this.pageHeight = this.computePageHeight();
+    const h = editorEl ? Math.max(editorEl.scrollHeight, editorEl.offsetHeight) : 0;
+    const total = Math.max(1, Math.ceil(h / this.pageHeight));
+    this.pages = new Array(total).fill(0);
+    if (this.currentPage >= total) this.currentPage = total - 1;
+    if (this.currentPage < 0) this.currentPage = 0;
+    return total;
   }
-  _findBreakPoint(text, start, idealEnd) {
-    const cap = this.computeCapacity();
-    const max = Math.min(text.length, start + Math.floor(cap.charsPerPage * 1.2));
-    for (let i = idealEnd; i > start + 100; i--) if (text[i] === '\n' && text[i + 1] === '\n') return i + 2;
-    for (let i = idealEnd; i > start + 50; i--) { const c = text[i]; if ((c === '.' || c === '!' || c === '?') && text[i + 1] === ' ') return i + 2; }
-    for (let i = idealEnd; i > start; i--) if (text[i] === ' ' || text[i] === '\n') return i + 1;
-    return Math.min(max, idealEnd);
-  }
-  getPageContaining(globalPos) {
-    for (let i = 0; i < this.pages.length; i++) if (globalPos >= this.pages[i].start && globalPos < this.pages[i].end) return i;
-    return Math.max(0, this.pages.length - 1);
+  // Which page a given vertical offset (px from top of content) falls on
+  pageAtOffset(offsetY) {
+    if (!this.pageHeight) return 0;
+    return Math.max(0, Math.min(this.pages.length - 1, Math.floor(offsetY / this.pageHeight)));
   }
 }
 function htmlToText(html) {
@@ -491,19 +496,10 @@ class Editor {
       const t = e.target;
       if (t && t.closest && t.closest('.paper-editor-input') && e.key === 'Enter') audio.play('return');
     }, true);
-    // Focus editor on click anywhere inside paper
+    // Focus editor on click anywhere inside the paper (e.g. empty margin space)
     this.paperStack.addEventListener('mousedown', (e) => {
       const pageEl = e.target.closest && e.target.closest('.paper-page');
       if (!pageEl) return;
-      if (pageEl.dataset.page !== '0') {
-        e.preventDefault();
-        const first = this.paperStack.querySelector('.paper-page[data-page="0"]');
-        if (first) {
-          first.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          setTimeout(() => this.editorEl && this.editorEl.focus(), 200);
-        }
-        return;
-      }
       if (e.target !== this.editorEl) {
         setTimeout(() => this.editorEl && this.editorEl.focus(), 0);
       }
@@ -546,7 +542,7 @@ class Editor {
       this.editorEl.innerHTML = h;
       this._suspendInput = false;
     }
-    pagination.rebuild(h);
+    this.updatePageBreaks();
   }
   focus() {
     if (!this.editorEl) return;
@@ -559,52 +555,69 @@ class Editor {
       sel.removeAllRanges(); sel.addRange(r);
     }
   }
+  // Build the single continuous paper sheet. All content lives in ONE
+  // contenteditable region — nothing is ever clipped — and page breaks
+  // are drawn as an overlay computed from the real rendered height.
   render() {
     const html = docs.current ? (docs.current.content || '') : (this.textarea.value || '');
-    pagination.rebuild(html);
     let caret = 0, wasFocused = false;
     if (this.editorEl && document.activeElement === this.editorEl) {
       caret = this._getCaretOffset(this.editorEl); wasFocused = true;
     }
     this.paperStack.innerHTML = '';
-    const total = Math.max(1, pagination.pages.length);
-    for (let i = 0; i < total; i++) {
-      const isActive = i === pagination.currentPage;
-      const p = el('div', { class: 'paper-page' + (isActive ? ' active' : ''), 'data-page': String(i) });
-      p.append(
-        el('div', { class: 'paper-page-margin-left' }),
-        el('div', { class: 'paper-page-margin-right' }),
-        el('div', { class: 'paper-page-texture' }),
-        el('div', { class: 'paper-page-guide' + (settings.get('pageGuide') ? ' visible' : '') })
-      );
-      const c = el('div', {
-        class: 'paper-page-content' + (i === 0 ? ' paper-editor-input' : ' paper-page-content-readonly'),
-        contenteditable: i === 0 ? 'true' : 'false',
-        spellcheck: 'true',
-        'data-placeholder': PLACEHOLDER_TEXT,
-        autocorrect: 'on', autocapitalize: 'on', autocomplete: 'on',
-        role: 'textbox', 'aria-multiline': 'true'
-      });
-      if (i === 0) c.innerHTML = html;
-      p.append(c);
-      p.append(el('div', { class: 'paper-page-num' }, `— ${i + 1} —`));
-      this.paperStack.appendChild(p);
-    }
-    this.editorEl = this.paperStack.querySelector('.paper-editor-input');
+    const p = el('div', { class: 'paper-page active', 'data-bg': settings.get('pageBackground') });
+    p.append(
+      el('div', { class: 'paper-page-margin-left' }),
+      el('div', { class: 'paper-page-margin-right' }),
+      el('div', { class: 'paper-page-texture' }),
+      el('div', { class: 'paper-page-guide' + (settings.get('pageGuide') ? ' visible' : '') }),
+      el('div', { class: 'page-breaks-overlay' })
+    );
+    const c = el('div', {
+      class: 'paper-page-content paper-editor-input',
+      contenteditable: 'true',
+      spellcheck: 'true',
+      'data-placeholder': PLACEHOLDER_TEXT,
+      autocorrect: 'on', autocapitalize: 'on', autocomplete: 'on',
+      role: 'textbox', 'aria-multiline': 'true'
+    });
+    c.innerHTML = html;
+    p.append(c);
+    this.paperStack.appendChild(p);
+    this.editorEl = c;
     if (wasFocused && this.editorEl) {
       this.editorEl.focus();
       setTimeout(() => this._setCaretOffset(this.editorEl, caret), 0);
     }
-    if (typeof ui !== 'undefined') { ui.updatePageIndicator(); ui.renderPageJumper(); }
+    this._observeResize();
+    this.updatePageBreaks();
     this.updatePosition();
   }
-  repaginate() {
-    const html = this.value;
-    pagination.rebuild(html);
-    const total = Math.max(1, pagination.pages.length);
-    const currentTotal = this.paperStack.querySelectorAll('.paper-page').length;
-    if (total !== currentTotal) this.render();
+  // Watch for content-height changes we didn't cause directly (async image
+  // loads, font swaps, table reflow) and re-measure pages when they happen.
+  _observeResize() {
+    if (this._resizeObserver) this._resizeObserver.disconnect();
+    if (typeof ResizeObserver === 'undefined' || !this.editorEl) return;
+    this._resizeObserver = new ResizeObserver(() => this._renderDebounce());
+    this._resizeObserver.observe(this.editorEl);
   }
+  // Re-measure real content height and rebuild the page-break overlay —
+  // this is the source of truth for page count, not a character estimate.
+  updatePageBreaks() {
+    if (!this.editorEl) return;
+    const total = pagination.measure(this.editorEl);
+    const overlay = this.paperStack.querySelector('.page-breaks-overlay');
+    if (overlay) {
+      overlay.innerHTML = '';
+      const ph = pagination.pageHeight;
+      for (let i = 0; i < total; i++) {
+        if (i > 0) overlay.appendChild(el('div', { class: 'page-break-line', style: { top: (i * ph) + 'px' } }));
+        overlay.appendChild(el('div', { class: 'page-break-label', style: { top: ((i + 1) * ph - 28) + 'px' } }, `— ${i + 1} —`));
+      }
+    }
+    if (typeof ui !== 'undefined') { ui.updatePageIndicator(); ui.renderPageJumper(); }
+  }
+  repaginate() { this.updatePageBreaks(); }
   _getCaretOffset(root) {
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount) return 0;
@@ -645,9 +658,7 @@ class Editor {
     audio.play('key');
     this.triggerTap();
     this._renderDebounce();
-    const caretOffset = this._getCaretOffset(this.editorEl);
-    const newPage = pagination.getPageContaining(caretOffset);
-    if (newPage !== pagination.currentPage) pagination.currentPage = newPage;
+    this._trackCaretPage();
     if (typeof ui !== 'undefined') {
       ui.updatePageIndicator();
       ui.updateStats();
@@ -657,6 +668,24 @@ class Editor {
     stats.update(docs.current.id, countWords(html));
     this.updateSaveStatus('typing');
     this.updatePosition();
+  }
+  // Determine which page the caret currently sits on, based on its actual
+  // rendered vertical position (not a character count).
+  _trackCaretPage() {
+    if (!this.editorEl) return;
+    try {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const r = sel.getRangeAt(0).cloneRange();
+      r.collapse(true);
+      const rects = typeof r.getClientRects === 'function' ? r.getClientRects() : null;
+      const rect = rects && rects[0];
+      if (!rect) return;
+      const editorRect = this.editorEl.getBoundingClientRect();
+      const relY = rect.top - editorRect.top;
+      const newPage = pagination.pageAtOffset(relY);
+      if (newPage !== pagination.currentPage) { pagination.currentPage = newPage; if (typeof ui !== 'undefined') ui.renderPageJumper(); }
+    } catch (e) { /* layout APIs can be unavailable in some environments; ignore */ }
   }
   triggerTap() {
     if (!settings.get('strikeAnim')) return;
@@ -693,12 +722,6 @@ class Editor {
     if (this.editorEl && document.activeElement === this.editorEl) { c = this._getCaretOffset(this.editorEl); w = true; }
     this.render();
     if (w && this.editorEl) { this.editorEl.focus(); setTimeout(() => this._setCaretOffset(this.editorEl, c), 0); }
-  }
-  setCursorToPage(idx) {
-    if (idx !== 0 || !this.editorEl) return;
-    this.editorEl.focus();
-    const page = pagination.pages[0];
-    if (page) this._setCaretOffset(this.editorEl, page.start);
   }
   refresh() { this.render(); }
 
@@ -779,37 +802,465 @@ class Editor {
 let editor;
 
 // ============================================
-// EXPORT — DocX (HTML-based, real .docx content)
+// IMAGE TOOLS — select, resize handle, floating toolbar, crop
 // ============================================
-function exportDocx(title, htmlContent) {
-  // Build a minimal but valid Word doc using HTML; not a true OOXML .docx but
-  // a .docx extension on an HTML file works in Word/Google Docs (it'll import).
-  // For a real OOXML we'd need a zip library. HTML-in-.docx is a pragmatic
-  // solution that opens everywhere.
-  const docHtml = `<!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
-<head>
-<meta charset="utf-8">
-<title>${escapeHtml(title)}</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
-<style>
-  body { font-family: 'Courier Prime', 'Courier New', monospace; font-size: 11pt; line-height: 1.5; }
-  h1, h2, h3 { color: #000; }
-  table { border-collapse: collapse; width: 100%; }
-  td, th { border: 1px solid #888; padding: 6pt; }
-  img { max-width: 100%; height: auto; }
-</style>
-</head><body>
-<h1>${escapeHtml(title)}</h1>
-${htmlContent || '<p></p>'}
-</body></html>`;
-  return docHtml;
-}
+const ImageTools = {
+  selectedImg: null, toolbarEl: null, handleEl: null, _cropWired: false,
+  init() {
+    document.addEventListener('mousedown', (e) => {
+      const img = e.target.closest && e.target.closest('.paper-editor-input img');
+      if (img) { this.select(img); }
+      else if (!e.target.closest('.img-toolbar') && !e.target.closest('.img-resize-handle')) { this.deselect(); }
+    });
+    window.addEventListener('scroll', () => { if (this.selectedImg) this.positionUI(); }, true);
+    window.addEventListener('resize', () => { if (this.selectedImg) this.positionUI(); });
+  },
+  select(img) {
+    this.deselect();
+    this.selectedImg = img;
+    img.classList.add('img-selected');
+    this.buildUI();
+  },
+  deselect() {
+    if (this.selectedImg) this.selectedImg.classList.remove('img-selected');
+    this.selectedImg = null;
+    if (this.toolbarEl) { this.toolbarEl.remove(); this.toolbarEl = null; }
+    if (this.handleEl) { this.handleEl.remove(); this.handleEl = null; }
+  },
+  buildUI() {
+    const mkBtn = (label, fn) => {
+      const b = el('button', {}, label);
+      b.addEventListener('mousedown', (e) => e.preventDefault());
+      b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
+      return b;
+    };
+    const tb = el('div', { class: 'img-toolbar' },
+      mkBtn('S', () => this.setWidth(200)),
+      mkBtn('M', () => this.setWidth(400)),
+      mkBtn('L', () => this.setWidth(700)),
+      mkBtn('Original', () => this.resetSize()),
+      mkBtn('Crop', () => this.openCrop()),
+      mkBtn('Delete', () => this.deleteImage())
+    );
+    document.body.appendChild(tb);
+    this.toolbarEl = tb;
+    const handle = el('div', { class: 'img-resize-handle' });
+    handle.addEventListener('mousedown', (e) => this.startResize(e));
+    document.body.appendChild(handle);
+    this.handleEl = handle;
+    this.positionUI();
+  },
+  positionUI() {
+    if (!this.selectedImg || !this.selectedImg.isConnected) { this.deselect(); return; }
+    const r = this.selectedImg.getBoundingClientRect();
+    if (this.toolbarEl) {
+      this.toolbarEl.style.left = Math.max(4, r.left) + 'px';
+      this.toolbarEl.style.top = Math.max(4, r.top - 38) + 'px';
+    }
+    if (this.handleEl) {
+      this.handleEl.style.left = (r.right - 6) + 'px';
+      this.handleEl.style.top = (r.bottom - 6) + 'px';
+    }
+  },
+  setWidth(w) {
+    const img = this.selectedImg; if (!img) return;
+    const rect = img.getBoundingClientRect();
+    const ratio = (img.naturalWidth && img.naturalHeight) ? (img.naturalHeight / img.naturalWidth) : (rect.height / rect.width || 0.75);
+    img.style.width = w + 'px';
+    img.style.height = Math.round(w * ratio) + 'px';
+    img.removeAttribute('width'); img.removeAttribute('height');
+    this.positionUI();
+    editor && editor._onInput();
+  },
+  resetSize() {
+    const img = this.selectedImg; if (!img) return;
+    img.style.width = ''; img.style.height = '';
+    this.positionUI();
+    editor && editor._onInput();
+  },
+  startResize(e) {
+    e.preventDefault(); e.stopPropagation();
+    const img = this.selectedImg; if (!img) return;
+    const startX = e.clientX;
+    const startRect = img.getBoundingClientRect();
+    const ratio = startRect.height / startRect.width;
+    const onMove = (ev) => {
+      const newW = Math.max(40, startRect.width + (ev.clientX - startX));
+      img.style.width = newW + 'px';
+      img.style.height = Math.round(newW * ratio) + 'px';
+      img.removeAttribute('width'); img.removeAttribute('height');
+      this.positionUI();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      editor && editor._onInput();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  },
+  openCrop() {
+    const img = this.selectedImg; if (!img) return;
+    const modalImg = $('#cropImage');
+    const box = $('#cropBox');
+    modalImg.src = img.src;
+    $('#cropModal').classList.add('open');
+    const initBox = () => {
+      const iw = modalImg.clientWidth, ih = modalImg.clientHeight;
+      const bw = iw * 0.7, bh = ih * 0.7;
+      box.style.left = ((iw - bw) / 2) + 'px';
+      box.style.top = ((ih - bh) / 2) + 'px';
+      box.style.width = bw + 'px';
+      box.style.height = bh + 'px';
+    };
+    if (modalImg.complete && modalImg.naturalWidth) initBox(); else modalImg.onload = initBox;
+    this._wireCropBox();
+  },
+  _wireCropBox() {
+    if (this._cropWired) return;
+    this._cropWired = true;
+    const box = $('#cropBox'); const stage = $('#cropStage'); const handle = $('#cropBoxHandle');
+    let dragging = false, resizing = false;
+    let dragOffset = { x: 0, y: 0 };
+    let resizeStart = { x: 0, y: 0, w: 0, h: 0 };
+    box.addEventListener('mousedown', (e) => {
+      if (e.target === handle) return;
+      dragging = true;
+      const r = box.getBoundingClientRect();
+      dragOffset = { x: e.clientX - r.left, y: e.clientY - r.top };
+      e.preventDefault();
+    });
+    handle.addEventListener('mousedown', (e) => {
+      resizing = true;
+      resizeStart = { x: e.clientX, y: e.clientY, w: box.offsetWidth, h: box.offsetHeight };
+      e.preventDefault(); e.stopPropagation();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging && !resizing) return;
+      const stageRect = stage.getBoundingClientRect();
+      if (dragging) {
+        let left = e.clientX - stageRect.left - dragOffset.x;
+        let top = e.clientY - stageRect.top - dragOffset.y;
+        left = Math.max(0, Math.min(stageRect.width - box.offsetWidth, left));
+        top = Math.max(0, Math.min(stageRect.height - box.offsetHeight, top));
+        box.style.left = left + 'px'; box.style.top = top + 'px';
+      } else if (resizing) {
+        let w = Math.max(30, resizeStart.w + (e.clientX - resizeStart.x));
+        let h = Math.max(30, resizeStart.h + (e.clientY - resizeStart.y));
+        w = Math.min(w, stageRect.width - box.offsetLeft);
+        h = Math.min(h, stageRect.height - box.offsetTop);
+        box.style.width = w + 'px'; box.style.height = h + 'px';
+      }
+    });
+    document.addEventListener('mouseup', () => { dragging = false; resizing = false; });
+  },
+  applyCrop() {
+    const img = this.selectedImg; if (!img) return;
+    const modalImg = $('#cropImage'); const box = $('#cropBox');
+    if (!modalImg.naturalWidth) return;
+    const scaleX = modalImg.naturalWidth / modalImg.clientWidth;
+    const scaleY = modalImg.naturalHeight / modalImg.clientHeight;
+    const sx = box.offsetLeft * scaleX, sy = box.offsetTop * scaleY;
+    const sw = box.offsetWidth * scaleX, sh = box.offsetHeight * scaleY;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(sw));
+    canvas.height = Math.max(1, Math.round(sh));
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(modalImg, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    img.src = canvas.toDataURL('image/png');
+    img.style.width = ''; img.style.height = '';
+    img.removeAttribute('width'); img.removeAttribute('height');
+    this.closeCrop();
+    setTimeout(() => this.positionUI(), 50);
+    editor && editor._onInput();
+  },
+  closeCrop() { $('#cropModal').classList.remove('open'); },
+  deleteImage() {
+    if (!this.selectedImg) return;
+    this.selectedImg.remove();
+    this.deselect();
+    editor && editor._onInput();
+  }
+};
 
 // ============================================
-// DOCX EXPORT (proper Office Open XML using JSZip fallback / or HTML-in-docx)
-// We'll provide both .docx (HTML-based, works everywhere) and .pdf via print
+// DOCX EXPORT — a genuine Office Open XML (.docx) file,
+// built with a small dependency-free ZIP writer so it opens
+// correctly in Word, Google Docs, and LibreOffice (previously
+// this shipped raw HTML with a .docx extension, which modern
+// Word/Google Docs reject as corrupted since it isn't a real
+// ZIP/OOXML package).
 // ============================================
+
+// ---- Minimal ZIP writer (STORE method, no compression needed) ----
+function crc32(bytes) {
+  if (!crc32._table) {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    crc32._table = t;
+  }
+  const t = crc32._table;
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ t[(crc ^ bytes[i]) & 0xFF];
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+function makeZip(files) {
+  // files: [{ name: string, data: Uint8Array }]
+  const enc = new TextEncoder();
+  const now = new Date();
+  const dosTime = (((now.getHours()) & 0x1f) << 11) | (((now.getMinutes()) & 0x3f) << 5) | (((now.getSeconds() / 2) | 0) & 0x1f);
+  const dosDate = ((Math.max(0, now.getFullYear() - 1980) & 0x7f) << 9) | (((now.getMonth() + 1) & 0xf) << 5) | (now.getDate() & 0x1f);
+  const locals = []; const centrals = [];
+  let offset = 0;
+  files.forEach(f => {
+    const nameBytes = enc.encode(f.name);
+    const data = f.data;
+    const crc = crc32(data);
+    const size = data.length;
+    const lh = new Uint8Array(30 + nameBytes.length);
+    const dv = new DataView(lh.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0, true);
+    dv.setUint16(8, 0, true); // method: store
+    dv.setUint16(10, dosTime, true);
+    dv.setUint16(12, dosDate, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, size, true);
+    dv.setUint32(22, size, true);
+    dv.setUint16(26, nameBytes.length, true);
+    dv.setUint16(28, 0, true);
+    lh.set(nameBytes, 30);
+    locals.push(lh, data);
+
+    const ch = new Uint8Array(46 + nameBytes.length);
+    const cdv = new DataView(ch.buffer);
+    cdv.setUint32(0, 0x02014b50, true);
+    cdv.setUint16(4, 20, true);
+    cdv.setUint16(6, 20, true);
+    cdv.setUint16(8, 0, true);
+    cdv.setUint16(10, 0, true);
+    cdv.setUint16(12, dosTime, true);
+    cdv.setUint16(14, dosDate, true);
+    cdv.setUint32(16, crc, true);
+    cdv.setUint32(20, size, true);
+    cdv.setUint32(24, size, true);
+    cdv.setUint16(28, nameBytes.length, true);
+    cdv.setUint16(30, 0, true);
+    cdv.setUint16(32, 0, true);
+    cdv.setUint16(34, 0, true);
+    cdv.setUint16(36, 0, true);
+    cdv.setUint32(38, 0, true);
+    cdv.setUint32(42, offset, true);
+    ch.set(nameBytes, 46);
+    centrals.push(ch);
+    offset += lh.length + data.length;
+  });
+  const centralStart = offset;
+  const centralSize = centrals.reduce((s, c) => s + c.length, 0);
+  const eocd = new Uint8Array(22);
+  const edv = new DataView(eocd.buffer);
+  edv.setUint32(0, 0x06054b50, true);
+  edv.setUint16(4, 0, true);
+  edv.setUint16(6, 0, true);
+  edv.setUint16(8, files.length, true);
+  edv.setUint16(10, files.length, true);
+  edv.setUint32(12, centralSize, true);
+  edv.setUint32(16, centralStart, true);
+  edv.setUint16(20, 0, true);
+  const all = [...locals, ...centrals, eocd];
+  const total = all.reduce((s, a) => s + a.length, 0);
+  const out = new Uint8Array(total);
+  let p = 0;
+  all.forEach(a => { out.set(a, p); p += a.length; });
+  return out;
+}
+
+// ---- HTML -> OOXML word/document.xml body ----
+function xmlEscape(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+function htmlToDocxParts(container) {
+  const mediaFiles = []; const rels = []; let bodyXml = '';
+
+  function runProps(state) {
+    let p = '';
+    if (state.bold) p += '<w:b/>';
+    if (state.italic) p += '<w:i/>';
+    if (state.underline) p += '<w:u w:val="single"/>';
+    if (state.strike) p += '<w:strike/>';
+    if (state.size) p += `<w:sz w:val="${state.size}"/><w:szCs w:val="${state.size}"/>`;
+    return p ? `<w:rPr>${p}</w:rPr>` : '';
+  }
+  function textRun(text, state) {
+    if (text === '' || text == null) return '';
+    return `<w:r>${runProps(state)}<w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r>`;
+  }
+  function imageRun(imgEl) {
+    const src = imgEl.getAttribute('src') || '';
+    const m = /^data:(image\/(png|jpe?g|gif|webp));base64,(.*)$/i.exec(src);
+    if (!m) return '';
+    let mime = m[1].toLowerCase();
+    let ext = m[2].toLowerCase(); if (ext === 'jpeg') ext = 'jpg';
+    const b64 = m[3];
+    let bin; try { bin = atob(b64); } catch (e) { return ''; }
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const mediaName = `image${mediaFiles.length + 1}.${ext}`;
+    mediaFiles.push({ name: mediaName, data: bytes, ext });
+    const rId = 'rIdImg' + mediaFiles.length;
+    rels.push({ id: rId, target: `media/${mediaName}` });
+    let w = imgEl.naturalWidth || imgEl.width || 400;
+    let h = imgEl.naturalHeight || imgEl.height || 300;
+    const maxW = 500;
+    if (w > maxW) { h = Math.round(h * (maxW / w)); w = maxW; }
+    if (!w || !h) { w = 400; h = 300; }
+    const emuW = Math.round(w * 9525), emuH = Math.round(h * 9525);
+    const idNum = mediaFiles.length;
+    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${emuW}" cy="${emuH}"/><wp:docPr id="${idNum}" name="Image${idNum}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${idNum}" name="Image${idNum}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${emuW}" cy="${emuH}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  }
+  function walkInline(node, state) {
+    let out = '';
+    node.childNodes.forEach(n => {
+      if (n.nodeType === Node.TEXT_NODE) { out += textRun(n.textContent, state); return; }
+      if (n.nodeType !== Node.ELEMENT_NODE) return;
+      const tag = n.tagName.toLowerCase();
+      if (tag === 'img') { out += imageRun(n); return; }
+      if (tag === 'br') { out += '<w:r><w:br/></w:r>'; return; }
+      const ns = Object.assign({}, state);
+      if (tag === 'strong' || tag === 'b') ns.bold = true;
+      if (tag === 'em' || tag === 'i') ns.italic = true;
+      if (tag === 'u') ns.underline = true;
+      if (tag === 's' || tag === 'strike' || tag === 'del') ns.strike = true;
+      if (tag === 'a') { out += walkInline(n, ns) + textRun(' (' + (n.getAttribute('href') || '') + ')', {}); return; }
+      out += walkInline(n, ns);
+    });
+    return out;
+  }
+  function alignVal(node) {
+    const ta = (node.style && node.style.textAlign) || '';
+    if (ta === 'center') return 'center';
+    if (ta === 'right') return 'end';
+    if (ta === 'justify') return 'both';
+    return null;
+  }
+  function paragraph(runsXml, opts) {
+    opts = opts || {};
+    let pPr = '';
+    if (opts.align) pPr += `<w:jc w:val="${opts.align}"/>`;
+    if (opts.indent) pPr += `<w:ind w:left="${opts.indent}"/>`;
+    const pPrXml = pPr ? `<w:pPr>${pPr}</w:pPr>` : '';
+    return `<w:p>${pPrXml}${runsXml || textRun('', {})}</w:p>`;
+  }
+  function tableXml(table) {
+    let rowsXml = '';
+    table.querySelectorAll('tr').forEach(tr => {
+      let cellsXml = '';
+      tr.querySelectorAll('td,th').forEach(td => {
+        cellsXml += `<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr>${paragraph(walkInline(td, {}))}</w:tc>`;
+      });
+      rowsXml += `<w:tr>${cellsXml}</w:tr>`;
+    });
+    return `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="888888"/><w:left w:val="single" w:sz="4" w:color="888888"/><w:bottom w:val="single" w:sz="4" w:color="888888"/><w:right w:val="single" w:sz="4" w:color="888888"/><w:insideH w:val="single" w:sz="4" w:color="888888"/><w:insideV w:val="single" w:sz="4" w:color="888888"/></w:tblBorders></w:tblPr>${rowsXml}</w:tbl>`;
+  }
+  function walkBlock(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (node.textContent.trim()) bodyXml += paragraph(textRun(node.textContent, {}));
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const tag = node.tagName.toLowerCase();
+    const align = alignVal(node);
+    if (tag === 'h1') { bodyXml += paragraph(walkInline(node, { bold: true, size: '32' }), { align }); return; }
+    if (tag === 'h2') { bodyXml += paragraph(walkInline(node, { bold: true, size: '28' }), { align }); return; }
+    if (tag === 'h3') { bodyXml += paragraph(walkInline(node, { bold: true, size: '24' }), { align }); return; }
+    if (tag === 'blockquote') { bodyXml += paragraph(walkInline(node, { italic: true }), { align, indent: 720 }); return; }
+    if (tag === 'p' || tag === 'div') { bodyXml += paragraph(walkInline(node, {}), { align }); return; }
+    if (tag === 'ul' || tag === 'ol') {
+      let idx = 1;
+      Array.from(node.children).forEach(li => {
+        if (li.tagName.toLowerCase() !== 'li') return;
+        const bullet = tag === 'ul' ? '•  ' : `${idx++}.  `;
+        bodyXml += paragraph(textRun(bullet, {}) + walkInline(li, {}), { indent: 360 });
+      });
+      return;
+    }
+    if (tag === 'table') { bodyXml += tableXml(node); return; }
+    if (tag === 'img') { bodyXml += paragraph(imageRun(node)); return; }
+    if (tag === 'br') return;
+    const inner = walkInline(node, {});
+    if (inner) bodyXml += paragraph(inner);
+  }
+  Array.from(container.childNodes).forEach(walkBlock);
+  return { bodyXml, mediaFiles, rels };
+}
+
+async function waitForImages(container) {
+  const imgs = Array.from(container.querySelectorAll('img'));
+  await Promise.all(imgs.map(img => new Promise(resolve => {
+    if (img.complete && img.naturalWidth) { resolve(); return; }
+    img.addEventListener('load', resolve, { once: true });
+    img.addEventListener('error', resolve, { once: true });
+    setTimeout(resolve, 2500);
+  })));
+}
+
+async function buildDocxBytes(title, htmlContent) {
+  const container = document.createElement('div');
+  container.style.cssText = 'position:absolute;left:-99999px;top:-99999px;';
+  container.innerHTML = htmlContent || '';
+  document.body.appendChild(container);
+  try {
+    await waitForImages(container);
+    const { bodyXml, mediaFiles, rels } = htmlToDocxParts(container);
+
+    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+<w:body>
+<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="40"/></w:rPr><w:t xml:space="preserve">${xmlEscape(title)}</w:t></w:r></w:p>
+${bodyXml}
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>
+</w:body>
+</w:document>`;
+
+    const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+    const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+${rels.map(r => `<Relationship Id="${r.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${r.target}"/>`).join('')}
+</Relationships>`;
+
+    const exts = Array.from(new Set(mediaFiles.map(m => m.ext)));
+    const extDefaults = { png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
+    const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+${exts.map(e => `<Default Extension="${e}" ContentType="${extDefaults[e] || 'application/octet-stream'}"/>`).join('')}
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+
+    const enc = new TextEncoder();
+    const files = [
+      { name: '[Content_Types].xml', data: enc.encode(contentTypes) },
+      { name: '_rels/.rels', data: enc.encode(rootRels) },
+      { name: 'word/document.xml', data: enc.encode(documentXml) }
+    ];
+    if (mediaFiles.length) {
+      files.push({ name: 'word/_rels/document.xml.rels', data: enc.encode(docRels) });
+      mediaFiles.forEach(m => files.push({ name: 'word/media/' + m.name, data: m.data }));
+    }
+    return makeZip(files);
+  } finally {
+    container.remove();
+  }
+}
 
 // ============================================
 // CONFIRM MODAL
@@ -882,6 +1333,7 @@ class UI {
     $('#testSoundBtn').addEventListener('click', () => { audio.init(); audio.resume(); setTimeout(()=>audio.test(),60); });
     $('#cplInput').addEventListener('input', (e) => { settings.set('charsPerLine', parseInt(e.target.value,10)); $('#cplValue').textContent=e.target.value; });
     $('#pageGuideToggle').addEventListener('change', (e) => { settings.set('pageGuide', e.target.checked); document.querySelectorAll('.paper-page-guide').forEach(g => g.classList.toggle('visible', e.target.checked)); });
+    $('#pageBgSelect')?.addEventListener('change', (e) => { settings.set('pageBackground', e.target.value); document.querySelectorAll('.paper-page').forEach(p => p.dataset.bg = e.target.value); });
     $('#strikeAnimToggle').addEventListener('change', (e) => settings.set('strikeAnim', e.target.checked));
 
     $('#goalInput').addEventListener('change', (e) => { settings.set('goal', parseInt(e.target.value,10)||0); this._celebrated=false; this.updateStats(); });
@@ -898,8 +1350,11 @@ class UI {
     $('#pageNextBtn').addEventListener('click', () => this.goToNextPage());
     $('#pageJumpBtn').addEventListener('click', () => this.showPageJumper());
     $('#exportBtn').addEventListener('click', () => this.openExport());
-    $('#printBtn').addEventListener('click', () => window.print());
-    $('#goalBtn').addEventListener('click', () => this.openGoalModal());
+    $('#printBtn')?.addEventListener('click', () => window.print());
+    $('#goalBtn')?.addEventListener('click', () => this.openGoalModal());
+    $('#statGoalCard')?.addEventListener('click', () => this.openGoalModal());
+    $('#hideHeaderBtn')?.addEventListener('click', () => this.toggleHeader(true));
+    $('#headerExpandBtn')?.addEventListener('click', () => this.toggleHeader(false));
 
     // Formatting toolbar
     $('#fmtBold').addEventListener('click', () => editor.exec('bold'));
@@ -968,6 +1423,10 @@ class UI {
     // Goal modal
     $('#closeGoalBtn').addEventListener('click', () => this.closeGoalModal());
     $('#goalBackdrop').addEventListener('click', () => this.closeGoalModal());
+    $('#closeCropBtn')?.addEventListener('click', () => ImageTools.closeCrop());
+    $('#cropBackdrop')?.addEventListener('click', () => ImageTools.closeCrop());
+    $('#cropCancelBtn')?.addEventListener('click', () => ImageTools.closeCrop());
+    $('#cropApplyBtn')?.addEventListener('click', () => ImageTools.applyCrop());
     $$('.goal-preset').forEach(b => b.addEventListener('click', () => {
       $$('.goal-preset').forEach(x => x.classList.remove('active')); b.classList.add('active');
       $('#goalCustomInput').value = b.dataset.goal;
@@ -1034,7 +1493,7 @@ class UI {
     });
   }
   populateSoundSelects() {
-    const sounds = [['off','Off (Muted)'],['click','Click'],['typewriter','Typewriter'],['royal','Royal'],['thock','Thock'],['soft','Soft']];
+    const sounds = [['off','Off (Muted)'],['calm','Calm (Soothing)'],['click','Click'],['typewriter','Typewriter'],['royal','Royal'],['thock','Thock'],['soft','Soft']];
     [$('#soundSelect'), $('#soundSelectS')].forEach(sel => {
       if (!sel) return; sel.innerHTML = '';
       sounds.forEach(([v, label]) => { const opt = el('option', { value: v }, label); if (v === settings.get('soundType')) opt.selected = true; sel.appendChild(opt); });
@@ -1055,6 +1514,7 @@ class UI {
     sC('#bellToggle', settings.get('bellEnabled')); sC('#carriageToggle', settings.get('carriageEnabled'));
     sV('#cplInput', settings.get('charsPerLine')); sT('#cplValue', settings.get('charsPerLine'));
     sC('#pageGuideToggle', settings.get('pageGuide'));
+    sV('#pageBgSelect', settings.get('pageBackground'));
     sC('#strikeAnimToggle', settings.get('strikeAnim'));
     sV('#goalInput', settings.get('goal'));
     sC('#autoSaveToggle', settings.get('autoSave'));
@@ -1073,6 +1533,11 @@ class UI {
     const $right = $('#panelRightCollapse');
     if ($left) $left.classList.toggle('collapsed', !!settings.get('panelLeftCollapsed'));
     if ($right) $right.classList.toggle('collapsed', !!settings.get('panelRightCollapsed'));
+    document.body.classList.toggle('header-hidden', !!settings.get('headerHidden'));
+  }
+  toggleHeader(hidden) {
+    document.body.classList.toggle('header-hidden', hidden);
+    settings.set('headerHidden', hidden);
   }
   togglePanel(which) {
     if (which === 'left') {
@@ -1149,32 +1614,27 @@ class UI {
     const $e3 = $('#pageProgressText'); if ($e3) $e3.textContent = Math.round((cur/total)*100) + '%';
     const $e4 = $('#statusPageInfo'); if ($e4) $e4.textContent = `${cur} of ${total}`;
     const $ji = $('#pageJumpInput'); if ($ji && document.activeElement !== $ji) { $ji.max = total; $ji.value = cur; }
-    document.querySelectorAll('.paper-page').forEach((p, i) => p.classList.toggle('active', i === pagination.currentPage));
   }
-  goToPrevPage() {
-    const target = Math.max(0, pagination.currentPage - 1);
-    pagination.currentPage = target;
+  // Scroll the paper so the target page's top aligns near the top of the
+  // viewport. Content is one continuous editable area, so navigation is
+  // pure scrolling — the caret is never moved.
+  scrollToPage(idx) {
+    const total = Math.max(1, pagination.pages.length);
+    idx = Math.max(0, Math.min(total - 1, idx));
+    pagination.currentPage = idx;
     this.renderPageJumper();
-    const pageEl = document.querySelector(`#paperStack [data-page="${target}"]`);
-    if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if (target === 0) editor.setCursorToPage(0);
+    if (!editor.editorEl) return;
+    const scroller = $('#paperScroll'); if (!scroller) return;
+    const editorRect = editor.editorEl.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    const targetY = (editorRect.top - scrollerRect.top) + scroller.scrollTop + idx * pagination.pageHeight - 20;
+    scroller.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
   }
-  goToNextPage() {
-    const target = Math.min(pagination.pages.length - 1, pagination.currentPage + 1);
-    pagination.currentPage = target;
-    this.renderPageJumper();
-    const pageEl = document.querySelector(`#paperStack [data-page="${target}"]`);
-    if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if (target === 0) editor.setCursorToPage(0);
-  }
+  goToPrevPage() { this.scrollToPage(pagination.currentPage - 1); }
+  goToNextPage() { this.scrollToPage(pagination.currentPage + 1); }
   jumpToPage(idx) {
-    if (isNaN(idx) || idx < 1) idx = 1;
-    if (idx > pagination.pages.length) idx = pagination.pages.length;
-    pagination.currentPage = idx - 1;
-    this.renderPageJumper();
-    const pageEl = document.querySelector(`#paperStack [data-page="${pagination.currentPage}"]`);
-    if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if (pagination.currentPage === 0) editor.setCursorToPage(0);
+    if (isNaN(idx)) return;
+    this.scrollToPage(idx - 1);
   }
   showPageJumper() {
     const input = $('#pageJumpInput');
@@ -1317,11 +1777,17 @@ class UI {
     downloadFile(slugify(docs.current.title) + '.md', md, 'text/markdown');
     this.closeExport(); this.notify('success','Exported as Markdown');
   }
-  exportDocx() {
+  async exportDocx() {
     if (!docs.current) return;
-    const content = exportDocx(docs.current.title, docs.current.content);
-    downloadFile(slugify(docs.current.title) + '.docx', content, 'application/vnd.ms-word');
-    this.closeExport(); this.notify('success','Exported as Word document');
+    this.notify('info', 'Building Word document…');
+    try {
+      const bytes = await buildDocxBytes(docs.current.title, docs.current.content);
+      downloadFile(slugify(docs.current.title) + '.docx', bytes, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      this.closeExport(); this.notify('success', 'Exported as Word document');
+    } catch (err) {
+      console.error('DOCX export failed', err);
+      this.notify('error', 'Failed to export Word document');
+    }
   }
   exportHtml() {
     if (!docs.current) return;
@@ -1488,6 +1954,7 @@ function boot() {
     editor = new Editor();
     editor.render();
     ui = new UI();
+    ImageTools.init();
     setTimeout(() => {
       const sp = $('#splash'); const app = $('#app');
       if (sp) sp.classList.add('hidden');

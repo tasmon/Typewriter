@@ -29,7 +29,8 @@
   </div>
 
   <div class="app-container" id="app">
-    <!-- TOP BAR — always visible -->
+    <button class="header-expand-btn" id="headerExpandBtn" title="Show header">▼</button>
+    <!-- TOP BAR -->
     <header class="top-bar">
       <div class="top-bar-left">
         <button class="icon-btn" id="docListBtn" title="Toggle document list">≡</button>
@@ -54,10 +55,9 @@
         <button class="icon-btn" id="newDocBtn" title="New document (Ctrl+N)">✚</button>
         <button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)">↶</button>
         <button class="icon-btn" id="redoBtn" title="Redo (Ctrl+Y)">↷</button>
-        <button class="icon-btn" id="goalBtn" title="Set daily goal">🎯</button>
         <button class="icon-btn" id="statsBtn" title="Toggle stats panel">📊</button>
-        <button class="icon-btn" id="printBtn" title="Print / PDF (Ctrl+P)">🖨</button>
-        <button class="icon-btn" id="exportBtn" title="Export (Ctrl+E)">⬇</button>
+        <button class="icon-btn" id="exportBtn" title="Export (Ctrl+E)">💾</button>
+        <button class="icon-btn" id="hideHeaderBtn" title="Hide header">▲</button>
         <button class="icon-btn" id="fullscreenBtn" title="Fullscreen">⛶</button>
         <button class="icon-btn" id="settingsBtn" title="Settings">⚙</button>
       </div>
@@ -136,7 +136,7 @@
             <div class="stat-value" id="statToday">0</div>
             <div class="stat-sub">words written</div>
           </div>
-          <div class="stat-card stat-progress">
+          <div class="stat-card stat-progress" id="statGoalCard" title="Click to set your daily goal" style="cursor:pointer;">
             <div class="stat-label">Goal</div>
             <div class="stat-value" id="statGoal">0/0</div>
             <div class="progress-bar"><div class="progress-fill" id="goalProgress"></div></div>
@@ -173,7 +173,7 @@
       </div>
       <div class="status-right">
         <span class="status-pill" title="Current page"><span id="statusPageInfo">1 of 1</span></span>
-        <span class="status-version">v<span id="appVersion">1.3.0</span></span>
+        <span class="status-version">v<span id="appVersion">1.4.0</span></span>
       </div>
     </footer>
 
@@ -204,6 +204,12 @@
           <h4>⌨ Typewriter</h4>
           <div class="setting-row"><label>Strike Animation</label><label class="switch"><input type="checkbox" id="strikeAnimToggle" /><span class="switch-slider"></span></label></div>
           <div class="setting-row"><label>Chars per Line <span class="setting-value" id="cplValue">80</span></label><input type="range" id="cplInput" min="40" max="120" value="80" /></div>
+          <div class="setting-row"><label>Page Background</label><select id="pageBgSelect" class="setting-select">
+            <option value="lines">Ruled lines</option>
+            <option value="grid">Grid</option>
+            <option value="dots">Dotted</option>
+            <option value="blank">Blank</option>
+          </select></div>
           <div class="setting-row"><label>Show Margin Guide</label><label class="switch"><input type="checkbox" id="pageGuideToggle" checked /><span class="switch-slider"></span></label></div>
         </div>
         <div class="settings-section">
@@ -226,7 +232,7 @@
           <div class="about-block">
             <div class="about-logo">⌨</div>
             <div class="about-name">Typewriter Web</div>
-            <div class="about-version">Version <span id="appVersionS">1.3.0</span></div>
+            <div class="about-version">Version <span id="appVersionS">1.4.0</span></div>
             <div class="about-dev">Developed by <strong>Tasmon Islam</strong></div>
             <div class="about-email"><a href="mailto:tasmon@outlook.com">tasmon@outlook.com</a></div>
             <div class="about-desc">A modern typewriter-themed PWA with rich text, images, tables, and real pagination. 100% private.</div>
@@ -319,6 +325,27 @@
             <span class="goal-custom-label">words</span>
           </div>
           <button class="btn btn-primary btn-full" id="goalSetBtn">Set Goal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CROP IMAGE MODAL -->
+    <div class="modal" id="cropModal" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" id="cropBackdrop"></div>
+      <div class="modal-content" style="max-width:640px;">
+        <div class="modal-header">
+          <h3>✂ Crop Image</h3>
+          <button class="icon-btn" id="closeCropBtn" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body modal-body-center">
+          <div class="crop-stage" id="cropStage">
+            <img id="cropImage" src="" alt="Crop preview" />
+            <div class="crop-box" id="cropBox"><div class="crop-box-handle" id="cropBoxHandle"></div></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" id="cropCancelBtn">Cancel</button>
+          <button class="btn btn-primary" id="cropApplyBtn">Apply Crop</button>
         </div>
       </div>
     </div>

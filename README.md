@@ -1,13 +1,42 @@
-# ⌨ Typewriter Web v1.3.0
+# ⌨ Typewriter Web v1.4.0
 
 A modern typewriter-themed Progressive Web App for distraction-free writing.
 
-![Version](https://img.shields.io/badge/Version-1.3.0-brown)
+![Version](https://img.shields.io/badge/Version-1.4.0-brown)
 ![PWA](https://img.shields.io/badge/PWA-installable-success)
 ![Privacy](https://img.shields.io/badge/privacy-zero%20tracking-blue)
 
 
-## ✨ What's New in v1.3.0
+## ✨ What's New in v1.4.0
+
+### 📑 Real Pagination
+- Page breaks are now measured from your actual rendered content, not estimated — nothing is ever clipped or hidden regardless of how much you write
+- Prev/Next/jump-to-page scroll accurately to the real page boundary
+
+### 📄 Real .docx Export
+- Export now produces a genuine Office Open XML (.docx) file — opens correctly in Word, Google Docs, and LibreOffice
+- Preserves headings, bold/italic/underline/strikethrough, alignment, lists, tables, and embedded images
+
+### 🖼 Image Resize & Crop
+- Click any inserted image to select it — drag the corner handle to resize, or use the S/M/L/Original quick sizes
+- New **Crop** tool with a draggable, resizable crop box
+
+### 🎨 Minimal, White-First Design
+- White theme is now the default
+- Decluttered top bar — fewer redundant icons, cleaner layout
+
+### 🔇 Focus Mode, Reworked
+- Top bar and toolbar now fade out on idle in Focus Mode, just like the status bar
+- New **Hide Header** button fully collapses the top bar — a small tab reappears to bring it back
+
+### 🔊 New Sound Scheme: Calm
+- A soft, soothing "Calmly Writer"-style typing sound — now the default
+- Typewriter sound refined for a more authentic mechanical clack
+
+### 🧵 Configurable Page Background
+- Choose the paper background style in Settings: Ruled Lines, Grid, Dotted, or Blank
+
+## What's New in v1.3.0
 
 ### 📝 Word Processing
 - **Bold, Italic, Underline, Strikethrough**
@@ -107,4 +136,4 @@ Installable on desktop & mobile, works offline, splash screen, standalone displa
 
 ## 💖 Credits
 
-Developer: Tasmon Islam | Email: tasmon@outlook.com | v1.3.0
+Developer: Tasmon Islam | Email: tasmon@outlook.com | v1.4.0

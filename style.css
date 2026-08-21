@@ -356,20 +356,44 @@ body {
 }
 .paper-page {
   background: var(--paper); color: var(--ink);
-  width: 100%; height: var(--paper-height);
+  width: 100%; height: auto; min-height: var(--paper-height);
   padding: 60px; position: relative;
   box-shadow: 0 8px 30px var(--paper-shadow), 0 0 0 1px var(--border-strong), inset 0 0 60px rgba(0, 0, 0, 0.03);
   border-radius: 2px;
+  transition: box-shadow 0.3s ease; flex-shrink: 0; overflow: visible;
+}
+/* Page background appearance — selectable in Settings */
+.paper-page[data-bg="lines"] {
   background-image: repeating-linear-gradient(0deg,
     transparent, transparent calc(var(--line-height) * 1em - 1px),
     var(--paper-line) calc(var(--line-height) * 1em - 1px),
     var(--paper-line) calc(var(--line-height) * 1em)
   );
-  transition: box-shadow 0.3s ease; flex-shrink: 0; overflow: hidden;
 }
+.paper-page[data-bg="grid"] {
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent calc(var(--line-height) * 1em - 1px), var(--paper-line) calc(var(--line-height) * 1em - 1px), var(--paper-line) calc(var(--line-height) * 1em)),
+    repeating-linear-gradient(90deg, transparent, transparent 27px, var(--paper-line) 27px, var(--paper-line) 28px);
+}
+.paper-page[data-bg="dots"] {
+  background-image: radial-gradient(var(--paper-line) 1px, transparent 1px);
+  background-size: 20px calc(var(--line-height) * 1em);
+}
+.paper-page[data-bg="blank"] { background-image: none; }
 .paper-page.active { box-shadow: 0 12px 40px var(--paper-shadow), 0 0 0 2px var(--accent), inset 0 0 60px rgba(0, 0, 0, 0.03); }
 .paper-page.tap { animation: paper-tap 0.06s ease; }
 @keyframes paper-tap { 0%,100% { transform: translate(0, 0); } 50% { transform: translate(0, -0.5px); } }
+
+/* Page-break overlay — visual divider lines computed from the real
+   rendered content height. The document is one continuous editable
+   area; nothing is ever clipped. */
+.page-breaks-overlay { position: absolute; top: 60px; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 3; }
+.page-break-line { position: absolute; left: 40px; right: 40px; height: 0; border-top: 1px dashed var(--paper-line); }
+.page-break-label {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-family); font-size: 11px;
+  color: var(--ink); opacity: 0.45; letter-spacing: 1px;
+}
 
 /* EDITOR + content styles for rich text */
 .paper-page-content {
@@ -403,13 +427,6 @@ body {
 .paper-editor-input:empty:not(:focus)::before {
   content: attr(data-placeholder); color: var(--ink); opacity: 0.35; font-style: italic;
   pointer-events: none; position: absolute; top: 0; left: 0;
-}
-.paper-page-content-readonly { color: var(--ink); opacity: 0.55; cursor: pointer; min-height: 200px; }
-
-.paper-page-num {
-  position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
-  font-family: var(--font-family); font-size: 11px;
-  color: var(--ink); opacity: 0.5; letter-spacing: 1px; z-index: 1;
 }
 .paper-page-margin-left, .paper-page-margin-right {
   position: absolute; top: 60px; bottom: 80px; width: 1px;
@@ -619,11 +636,33 @@ body {
 .install-prompt-text small { font-size: 11px; color: var(--text-dim); }
 .install-prompt-actions { display: flex; gap: 8px; }
 
-/* FOCUS MODE — only hides panels and bottom bar, top bar always visible */
-body.focus-mode .status-bar { opacity: 0.3; }
+/* FOCUS MODE — header + toolbar fade out when idle, panels tuck away */
+body.focus-mode .top-bar,
+body.focus-mode .format-toolbar { opacity: 0.12; transition: opacity 0.5s ease; }
+body.focus-mode.show-ui .top-bar,
+body.focus-mode.show-ui .format-toolbar { opacity: 1; }
+body.focus-mode .status-bar { opacity: 0.3; transition: opacity 0.5s ease; }
+body.focus-mode.show-ui .status-bar { opacity: 1; }
 body.focus-mode .side-panel { transform: translateX(-100%); }
 body.focus-mode .side-panel-right { transform: translateX(100%); }
 body.focus-mode .settings-panel { display: none; }
+
+/* HEADER HIDE — fully collapses the top bar + toolbar; a small tab
+   reappears to bring it back. */
+body.header-hidden .top-bar,
+body.header-hidden .format-toolbar { display: none; }
+.header-expand-btn {
+  display: none;
+  position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+  z-index: 60; width: 32px; height: 18px;
+  align-items: center; justify-content: center;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 0 0 8px 8px; color: var(--text-dim);
+  cursor: pointer; opacity: 0.5; transition: opacity 0.2s;
+  font-size: 12px;
+}
+.header-expand-btn:hover { opacity: 1; }
+body.header-hidden .header-expand-btn { display: flex; }
 
 /* RESPONSIVE */
 @media (max-width: 900px) {
@@ -655,7 +694,7 @@ body.focus-mode .settings-panel { display: none; }
 
 /* PRINT */
 @media print {
-  .top-bar, .format-toolbar, .status-bar, .side-panel, .settings-panel, .modal, .notifications, .install-prompt, .paper-page-margin-left, .paper-page-margin-right, .paper-page-texture, .paper-page-guide, .paper-page-num { display: none !important; }
+  .top-bar, .format-toolbar, .status-bar, .side-panel, .settings-panel, .modal, .notifications, .install-prompt, .paper-page-margin-left, .paper-page-margin-right, .paper-page-texture, .paper-page-guide, .page-breaks-overlay { display: none !important; }
   body, body[data-theme] { background: white !important; color: black !important; overflow: visible !important; }
   .app-container { height: auto !important; }
   .main-content { overflow: visible !important; display: block !important; }
@@ -665,4 +704,30 @@ body.focus-mode .settings-panel { display: none; }
   .paper-page { box-shadow: none !important; margin: 0 !important; padding: 30px !important; height: auto !important; min-height: auto !important; width: 100% !important; background: white !important; color: black !important; border-radius: 0 !important; page-break-after: always !important; background-image: none !important; }
   .paper-page:last-child { page-break-after: avoid !important; }
   .paper-page-content { color: black !important; font-family: Georgia, serif !important; line-height: 1.6 !important; }
+}
+
+/* IMAGE TOOLS — select, resize handle, floating toolbar, crop */
+.paper-editor-input img { cursor: pointer; max-width: 100%; }
+.paper-editor-input img.img-selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+.img-toolbar {
+  position: absolute; z-index: 50; display: flex; gap: 4px;
+  background: var(--modal-bg); border: 1px solid var(--border-strong);
+  border-radius: 8px; padding: 4px; box-shadow: 0 6px 20px var(--shadow-strong);
+}
+.img-toolbar button {
+  border: none; background: transparent; color: var(--text); font-size: 12px;
+  padding: 5px 8px; border-radius: 5px; cursor: pointer; white-space: nowrap;
+}
+.img-toolbar button:hover { background: var(--hover); }
+.img-resize-handle {
+  position: absolute; z-index: 50; width: 12px; height: 12px;
+  background: var(--accent); border: 2px solid var(--paper); border-radius: 50%;
+  cursor: nwse-resize;
+}
+.crop-stage { position: relative; display: inline-block; max-width: 100%; user-select: none; }
+.crop-stage img { display: block; max-width: 100%; max-height: 60vh; }
+.crop-box { position: absolute; border: 2px dashed var(--accent); box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); cursor: move; }
+.crop-box-handle {
+  position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px;
+  background: var(--accent); border: 2px solid #fff; border-radius: 50%; cursor: nwse-resize;
 }
