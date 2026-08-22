@@ -91,8 +91,7 @@ class Settings {
       carriageEnabled: true,
       charsPerLine: 80,
       strikeAnim: false,
-      pageGuide: true,
-      pageBackground: 'lines',   // lines | blank | grid | dots
+      pageBackground: 'blank',   // lines | blank | grid | dots
       goal: 500,
       autoSave: true,
       autoSaveInterval: 10,
@@ -567,10 +566,6 @@ class Editor {
     this.paperStack.innerHTML = '';
     const p = el('div', { class: 'paper-page active', 'data-bg': settings.get('pageBackground') });
     p.append(
-      el('div', { class: 'paper-page-margin-left' }),
-      el('div', { class: 'paper-page-margin-right' }),
-      el('div', { class: 'paper-page-texture' }),
-      el('div', { class: 'paper-page-guide' + (settings.get('pageGuide') ? ' visible' : '') }),
       el('div', { class: 'page-breaks-overlay' })
     );
     const c = el('div', {
@@ -1332,7 +1327,6 @@ class UI {
     $('#carriageToggle').addEventListener('change', (e) => settings.set('carriageEnabled', e.target.checked));
     $('#testSoundBtn').addEventListener('click', () => { audio.init(); audio.resume(); setTimeout(()=>audio.test(),60); });
     $('#cplInput').addEventListener('input', (e) => { settings.set('charsPerLine', parseInt(e.target.value,10)); $('#cplValue').textContent=e.target.value; });
-    $('#pageGuideToggle').addEventListener('change', (e) => { settings.set('pageGuide', e.target.checked); document.querySelectorAll('.paper-page-guide').forEach(g => g.classList.toggle('visible', e.target.checked)); });
     $('#pageBgSelect')?.addEventListener('change', (e) => { settings.set('pageBackground', e.target.value); document.querySelectorAll('.paper-page').forEach(p => p.dataset.bg = e.target.value); });
     $('#strikeAnimToggle').addEventListener('change', (e) => settings.set('strikeAnim', e.target.checked));
 
@@ -1427,6 +1421,9 @@ class UI {
     $('#cropBackdrop')?.addEventListener('click', () => ImageTools.closeCrop());
     $('#cropCancelBtn')?.addEventListener('click', () => ImageTools.closeCrop());
     $('#cropApplyBtn')?.addEventListener('click', () => ImageTools.applyCrop());
+    $('#helpBtn')?.addEventListener('click', () => this.openHelp());
+    $('#closeHelpBtn')?.addEventListener('click', () => this.closeHelp());
+    $('#helpBackdrop')?.addEventListener('click', () => this.closeHelp());
     $$('.goal-preset').forEach(b => b.addEventListener('click', () => {
       $$('.goal-preset').forEach(x => x.classList.remove('active')); b.classList.add('active');
       $('#goalCustomInput').value = b.dataset.goal;
@@ -1513,7 +1510,6 @@ class UI {
     sV('#volumeSlider', settings.get('volume')); sV('#volumeSliderS', settings.get('volume')); sT('#volumeValue', settings.get('volume') + '%');
     sC('#bellToggle', settings.get('bellEnabled')); sC('#carriageToggle', settings.get('carriageEnabled'));
     sV('#cplInput', settings.get('charsPerLine')); sT('#cplValue', settings.get('charsPerLine'));
-    sC('#pageGuideToggle', settings.get('pageGuide'));
     sV('#pageBgSelect', settings.get('pageBackground'));
     sC('#strikeAnimToggle', settings.get('strikeAnim'));
     sV('#goalInput', settings.get('goal'));
@@ -1763,6 +1759,8 @@ class UI {
   closeExport() { $('#exportModal')?.classList.remove('open'); }
   openGoalModal() { $('#goalModal')?.classList.add('open'); const $ci = $('#goalCustomInput'); if ($ci) $ci.value = settings.get('goal'); }
   closeGoalModal() { $('#goalModal')?.classList.remove('open'); }
+  openHelp() { $('#helpModal')?.classList.add('open'); }
+  closeHelp() { $('#helpModal')?.classList.remove('open'); }
 
   // ============== EXPORTS ==============
   exportTxt() {
@@ -1864,7 +1862,16 @@ img{max-width:100%}</style></head><body><h1>${escapeHtml(docs.current.title)}</h
       else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); this.redo(); }
       else if (k === 'e') { e.preventDefault(); this.openExport(); }
       else if (k === ',') { e.preventDefault(); this.toggleSettings(true); }
-      else if (k === '.') { e.preventDefault(); document.body.classList.toggle('focus-mode'); this.notify('info','Focus mode toggled'); }
+      else if (k === '.') {
+        e.preventDefault();
+        document.body.classList.toggle('focus-mode');
+        if (document.body.classList.contains('focus-mode')) {
+          document.body.classList.add('show-ui');
+          clearTimeout(this._focusTimer);
+          this._focusTimer = setTimeout(() => document.body.classList.remove('show-ui'), 2000);
+        }
+        this.notify('info','Focus mode toggled');
+      }
       else if (k === 'b') { e.preventDefault(); editor.exec('bold'); }
       else if (k === 'i') { e.preventDefault(); editor.exec('italic'); }
       else if (k === 'u') { e.preventDefault(); editor.exec('underline'); }
@@ -1879,6 +1886,8 @@ img{max-width:100%}</style></head><body><h1>${escapeHtml(docs.current.title)}</h
       if ($('#settingsPanel')?.classList.contains('open')) this.toggleSettings(false);
       else if ($('#exportModal')?.classList.contains('open')) this.closeExport();
       else if ($('#goalModal')?.classList.contains('open')) this.closeGoalModal();
+      else if ($('#helpModal')?.classList.contains('open')) this.closeHelp();
+      else if ($('#cropModal')?.classList.contains('open')) ImageTools.closeCrop();
       else if ($('#confirmModal')?.classList.contains('open')) closeConfirm();
       else if ($('#tableModal')?.classList.contains('open')) $('#tableModal').classList.remove('open');
       else if (document.body.classList.contains('focus-mode')) { document.body.classList.remove('focus-mode'); this.notify('info','Focus mode exited'); }

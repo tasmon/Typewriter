@@ -29,7 +29,7 @@
   </div>
 
   <div class="app-container" id="app">
-    <button class="header-expand-btn" id="headerExpandBtn" title="Show header">➕</button>
+    <button class="header-expand-btn" id="headerExpandBtn" title="Show header">▼</button>
     <!-- TOP BAR -->
     <header class="top-bar">
       <div class="top-bar-left">
@@ -53,13 +53,13 @@
       </div>
       <div class="top-bar-right">
         <button class="icon-btn" id="newDocBtn" title="New document (Ctrl+N)">✚</button>
-        <button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)">↩</button>
-        <button class="icon-btn" id="redoBtn" title="Redo (Ctrl+Y)">↪</button>
-        <button class="icon-btn" id="statsBtn" title="Toggle stats panel">👾</button>
+        <button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)">↶</button>
+        <button class="icon-btn" id="redoBtn" title="Redo (Ctrl+Y)">↷</button>
+        <button class="icon-btn" id="statsBtn" title="Toggle stats panel">📊</button>
         <button class="icon-btn" id="exportBtn" title="Export (Ctrl+E)">💾</button>
-        <button class="icon-btn" id="hideHeaderBtn" title="Hide header">➖</button>
+        <button class="icon-btn" id="hideHeaderBtn" title="Hide header">▲</button>
         <button class="icon-btn" id="fullscreenBtn" title="Fullscreen">⛶</button>
-        <button class="icon-btn" id="settingsBtn" title="Settings">⚙️</button>
+        <button class="icon-btn" id="settingsBtn" title="Settings">⚙</button>
       </div>
     </header>
 
@@ -205,12 +205,11 @@
           <div class="setting-row"><label>Strike Animation</label><label class="switch"><input type="checkbox" id="strikeAnimToggle" /><span class="switch-slider"></span></label></div>
           <div class="setting-row"><label>Chars per Line <span class="setting-value" id="cplValue">80</span></label><input type="range" id="cplInput" min="40" max="120" value="80" /></div>
           <div class="setting-row"><label>Page Background</label><select id="pageBgSelect" class="setting-select">
+            <option value="blank">Blank (white)</option>
             <option value="lines">Ruled lines</option>
             <option value="grid">Grid</option>
             <option value="dots">Dotted</option>
-            <option value="blank">Blank</option>
           </select></div>
-          <div class="setting-row"><label>Show Margin Guide</label><label class="switch"><input type="checkbox" id="pageGuideToggle" checked /><span class="switch-slider"></span></label></div>
         </div>
         <div class="settings-section">
           <h4>📝 Writing</h4>
@@ -238,8 +237,73 @@
             <div class="about-desc">A modern typewriter-themed PWA with rich text, images, tables, and real pagination. 100% private.</div>
           </div>
         </div>
+        <div class="settings-section">
+          <button class="btn btn-secondary btn-full" id="helpBtn">❓ Help &amp; Instructions</button>
+        </div>
       </div>
     </aside>
+
+    <!-- HELP MODAL -->
+    <div class="modal" id="helpModal" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" id="helpBackdrop"></div>
+      <div class="modal-content" style="max-width:560px;">
+        <div class="modal-header">
+          <h3>❓ Help &amp; Instructions</h3>
+          <button class="icon-btn" id="closeHelpBtn" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body help-body">
+          <section class="help-section">
+            <h4>Getting Started</h4>
+            <p>Click anywhere on the page and start typing. Your work saves automatically as you write — there are no accounts, no servers, and nothing leaves your device.</p>
+          </section>
+          <section class="help-section">
+            <h4>Formatting</h4>
+            <p>Select text and use the toolbar below the header for bold, italic, underline, strikethrough, headings, alignment, and lists. Click the 🖼 icon to insert an image or the ⊞ icon to insert a table.</p>
+          </section>
+          <section class="help-section">
+            <h4>Images</h4>
+            <p>Click any inserted image to select it. Drag the round handle at its corner to resize, use the S / M / L / Original buttons for quick sizing, or click Crop to trim it.</p>
+          </section>
+          <section class="help-section">
+            <h4>Pages</h4>
+            <p>Pagination is based on your actual content — page breaks appear automatically as you write. Use the page controls in the status bar to jump between pages, or change the page background style (ruled lines, grid, dots, or blank) in Settings → Typewriter.</p>
+          </section>
+          <section class="help-section">
+            <h4>Focus Mode</h4>
+            <p>Press <kbd>Ctrl+.</kbd> to enter Focus Mode, which tucks away the side panels and hides the header/toolbar when you're not moving the mouse. Move the mouse to bring them back briefly, or use the ▲ button to hide the header manually and the ▼ tab to bring it back.</p>
+          </section>
+          <section class="help-section">
+            <h4>Exporting</h4>
+            <p>Press <kbd>Ctrl+E</kbd> or click the export icon to save your document as .docx (Word), .pdf (via Print), .txt, .md, or .html.</p>
+          </section>
+          <section class="help-section">
+            <h4>Keyboard Shortcuts</h4>
+            <table class="help-shortcuts">
+              <tr><td><kbd>Ctrl+N</kbd></td><td>New document</td></tr>
+              <tr><td><kbd>Ctrl+S</kbd></td><td>Save</td></tr>
+              <tr><td><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></td><td>Undo / Redo</td></tr>
+              <tr><td><kbd>Ctrl+B</kbd> / <kbd>Ctrl+I</kbd> / <kbd>Ctrl+U</kbd></td><td>Bold / Italic / Underline</td></tr>
+              <tr><td><kbd>Ctrl+K</kbd></td><td>Insert link</td></tr>
+              <tr><td><kbd>Alt+1/2/3</kbd> / <kbd>Alt+0</kbd></td><td>Heading 1/2/3 / Paragraph</td></tr>
+              <tr><td><kbd>Ctrl+↑</kbd> / <kbd>Ctrl+↓</kbd></td><td>Previous / Next page</td></tr>
+              <tr><td><kbd>Ctrl+P</kbd></td><td>Print / PDF</td></tr>
+              <tr><td><kbd>Ctrl+E</kbd></td><td>Export menu</td></tr>
+              <tr><td><kbd>Ctrl+,</kbd></td><td>Settings</td></tr>
+              <tr><td><kbd>Ctrl+.</kbd></td><td>Focus mode</td></tr>
+              <tr><td><kbd>Esc</kbd></td><td>Close modals / exit focus</td></tr>
+            </table>
+          </section>
+          <section class="help-section">
+            <h4>Installing as an App</h4>
+            <p>On desktop and mobile browsers that support it, you can install Typewriter Web as an app for offline use — look for an install prompt or your browser's "Install app" option.</p>
+          </section>
+          <section class="help-section">
+            <h4>Privacy</h4>
+            <p>Everything is stored locally in your browser. Nothing is uploaded, tracked, or shared.</p>
+          </section>
+        </div>
+      </div>
+    </div>
 
     <!-- EXPORT MODAL — adds .docx and .html options -->
     <div class="modal" id="exportModal" role="dialog" aria-modal="true">
@@ -405,9 +469,5 @@
   </div>
 
   <script src="app.js"></script>
-  
-  <script data-goatcounter="https://typewriterweb.goatcounter.com/count"
-        async src="//gc.zgo.at/count.js"></script>
-  
 </body>
 </html>
